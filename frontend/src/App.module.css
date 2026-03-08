@@ -1,0 +1,29 @@
+.root {
+  min-height: 100vh;
+  background: #f9fafb;
+}
+
+.header {
+  background: #6366f1;
+  color: #fff;
+  padding: 20px 24px;
+  margin-bottom: 24px;
+}
+
+.logo {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.tagline {
+  margin: 4px 0 0;
+  font-size: 13px;
+  opacity: 0.85;
+}
+
+.main {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 0 16px 48px;
+}

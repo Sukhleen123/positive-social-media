@@ -1,0 +1,43 @@
+.wrapper {
+  position: relative;
+}
+
+.blurred {
+  filter: blur(8px);
+  pointer-events: none;
+  user-select: none;
+}
+
+.sensitiveOverlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 8px;
+}
+
+.sensitiveLabel {
+  color: #fff;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.revealBtn {
+  padding: 6px 16px;
+  background: #fff;
+  border: none;
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: #333;
+  transition: background 0.15s;
+}
+
+.revealBtn:hover {
+  background: #f0f0f0;
+}
