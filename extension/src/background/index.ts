@@ -8,6 +8,7 @@ import {
 } from '../shared/storage';
 import { TriggerData, ScoreBatchResponse, GetStatusResponse } from '../shared/types';
 import { computeHybridScoreFromEmbedding, unpackEmbeddings } from '../shared/scoring';
+import { PREDEFINED_TOPICS } from '../shared/topics';
 
 // ---- Singleton model state ----
 let embedder: FeatureExtractionPipeline | null = null;
@@ -70,12 +71,37 @@ async function broadcastToRedditTabs(message: object) {
 
 // ---- SAVE_TRIGGER ----
 
-async function callHyDE(triggerText: string, apiKey: string): Promise<{
+const STOPWORDS = new Set([
+  'a', 'an', 'the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with',
+  'is', 'are', 'was', 'were', 'be', 'have', 'has', 'do', 'does', 'did', 'will', 'would',
+  'could', 'should', 'may', 'might', 'i', 'you', 'he', 'she', 'it', 'we', 'they',
+  'my', 'your', 'his', 'her', 'its', 'our', 'their', 'that', 'this', 'which', 'who',
+]);
+
+function extractBasicKeywords(text: string): string[] {
+  const words = text.toLowerCase().split(/[^a-z0-9]+/);
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const word of words) {
+    if (word.length >= 3 && !STOPWORDS.has(word) && !seen.has(word)) {
+      seen.add(word);
+      result.push(word);
+      if (result.length >= 15) break;
+    }
+  }
+  return result;
+}
+
+async function callHyDE(triggerText: string, apiKey: string, topicLabels?: string[]): Promise<{
   examples: string[];
   keywords: string[];
   exclusions: string[];
 }> {
-  const prompt = `You are helping build a content moderation filter. The user wants to avoid content related to: "${triggerText}"
+  const topicsClause = topicLabels && topicLabels.length > 0
+    ? `\nThe user also wants to filter these broad topics: ${topicLabels.join(', ')}.`
+    : '';
+
+  const prompt = `You are helping build a content moderation filter. The user wants to avoid content related to: "${triggerText}"${topicsClause}
 
 Generate a JSON response with:
 - "examples": 4 short example sentences (1-2 sentences each) that would match this trigger
@@ -121,6 +147,7 @@ async function handleSaveTrigger(
   triggerText: string,
   apiKey: string,
   _threshold: number,
+  selectedTopics: string[] = [],
 ): Promise<{ success: boolean; error?: string }> {
   if (!modelReady || !embedder) {
     return { success: false, error: 'Model not ready yet' };
@@ -131,24 +158,40 @@ async function handleSaveTrigger(
     let keywords: string[] = [];
     let exclusionTerms: string[] = [];
 
+    // Resolve selected predefined topics
+    const topicObjects = PREDEFINED_TOPICS.filter((t) => selectedTopics.includes(t.id));
+    const topicKeywords = topicObjects.flatMap((t) => t.keywords);
+    const topicDescriptions = topicObjects.map((t) => t.description);
+    const topicLabels = topicObjects.map((t) => t.label);
+
     if (apiKey.trim()) {
       try {
-        const hydeResult = await callHyDE(triggerText, apiKey.trim());
+        const hydeResult = await callHyDE(triggerText, apiKey.trim(), topicLabels);
         examples = hydeResult.examples.length > 0 ? hydeResult.examples : [triggerText];
         keywords = hydeResult.keywords;
         exclusionTerms = hydeResult.exclusions;
       } catch (err) {
         console.warn('[PSM] HyDE expansion failed, falling back:', err);
         examples = [triggerText];
+        keywords = extractBasicKeywords(triggerText);
       }
+    } else {
+      keywords = extractBasicKeywords(triggerText);
     }
+
+    // Merge topic keywords (deduplicated)
+    const allKeywords = Array.from(new Set([...keywords, ...topicKeywords]));
+    keywords = allKeywords;
+
+    // Merge topic descriptions as additional hypothetical examples
+    const allExamples = [...examples, ...topicDescriptions];
 
     // Embed trigger text
     const triggerEmbedding = await embedText(triggerText);
 
     // Embed all hypothetical examples
     const hypotheticalEmbeddings: number[][] = [];
-    for (const ex of examples) {
+    for (const ex of allExamples) {
       const emb = await embedText(ex);
       hypotheticalEmbeddings.push(emb);
     }
@@ -161,7 +204,7 @@ async function handleSaveTrigger(
 
     const triggerData: TriggerData = {
       rawText: triggerText,
-      hypotheticalExamples: examples,
+      hypotheticalExamples: allExamples,
       keywords,
       exclusionTerms,
       triggerEmbeddingFlat,
@@ -265,6 +308,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       msg.triggerText as string,
       msg.anthropicApiKey as string,
       msg.threshold as number,
+      msg.selectedTopics as string[],
     ).then(sendResponse);
     return true;
   }

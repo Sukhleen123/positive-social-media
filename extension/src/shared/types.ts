@@ -4,14 +4,16 @@ export interface ExtensionSettings {
   anthropicApiKey: string;
   triggerText: string;
   pipelineVersion: string;
+  selectedTopics: string[];
 }
 
 export const DEFAULT_SETTINGS: ExtensionSettings = {
   enabled: true,
-  threshold: 0.38,
+  threshold: 0.25,
   anthropicApiKey: '',
   triggerText: '',
   pipelineVersion: 'hyde-v1',
+  selectedTopics: [],
 };
 
 // Stored in chrome.storage.local (too large for .sync 8KB/key limit)
@@ -35,6 +37,7 @@ export interface SaveTriggerMessage {
   triggerText: string;
   anthropicApiKey: string;
   threshold: number;
+  selectedTopics: string[];
 }
 
 export interface ScoreBatchMessage {
