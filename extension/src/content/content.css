@@ -1,0 +1,155 @@
+/* Positive Social Media — content script styles
+   All classes prefixed psm- to avoid Reddit collisions */
+
+.psm-wrapper {
+  position: relative;
+}
+
+.psm-blurred {
+  filter: blur(8px);
+  pointer-events: none;
+  user-select: none;
+}
+
+/* Pending shimmer — non-blocking */
+.psm-overlay--pending {
+  position: absolute;
+  inset: 0;
+  background: rgba(129, 140, 248, 0.08);
+  border-radius: 4px;
+  pointer-events: none;
+  animation: psm-shimmer 1.5s ease-in-out infinite;
+}
+
+@keyframes psm-shimmer {
+  0%   { opacity: 0.4; }
+  50%  { opacity: 0.9; }
+  100% { opacity: 0.4; }
+}
+
+/* Sensitive overlay — full cover with reveal button */
+.psm-overlay--sensitive {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: rgba(0, 0, 0, 0.45);
+  border-radius: 4px;
+  z-index: 10;
+}
+
+.psm-overlay--sensitive .psm-label {
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 12px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  letter-spacing: 0.3px;
+}
+
+/* Revealed bottom bar */
+.psm-revealed-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  margin-top: 4px;
+}
+
+/* Buttons */
+.psm-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-weight: 500;
+  border: none;
+  border-radius: 20px;
+  cursor: pointer;
+  line-height: 1;
+  transition: opacity 0.15s;
+}
+
+.psm-btn:hover {
+  opacity: 0.85;
+}
+
+.psm-btn--reveal {
+  background: #818cf8;
+  color: #fff;
+}
+
+.psm-btn--hide {
+  background: #e8e8e8;
+  color: #555;
+}
+
+.psm-btn--unflag {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 11px;
+  padding: 4px 10px;
+}
+
+.psm-btn--unflag-bar {
+  background: transparent;
+  border: 1px solid #bbb;
+  color: #888;
+  font-size: 11px;
+  padding: 4px 10px;
+}
+
+/* Score chips */
+.psm-score-chip {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10px;
+  font-family: 'SF Mono', 'Fira Code', ui-monospace, monospace;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  padding: 2px 6px;
+  border-radius: 10px;
+  line-height: 1.4;
+  pointer-events: none;
+}
+
+/* Safe: small chip anchored to top-right of wrapper */
+.psm-score-chip--safe {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 5;
+  background: rgba(0, 0, 0, 0.06);
+  color: #888;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+/* On dark Reddit themes */
+@media (prefers-color-scheme: dark) {
+  .psm-score-chip--safe {
+    background: rgba(255, 255, 255, 0.07);
+    color: #aaa;
+    border-color: rgba(255, 255, 255, 0.1);
+  }
+}
+
+/* Sensitive overlay: chip sits inline next to label */
+.psm-score-chip--sensitive {
+  background: rgba(255, 255, 255, 0.18);
+  color: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  margin-left: 4px;
+  vertical-align: middle;
+}
+
+/* Revealed bar: chip sits inline with buttons */
+.psm-score-chip--revealed {
+  background: rgba(0, 0, 0, 0.06);
+  color: #888;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  margin-left: 4px;
+}
