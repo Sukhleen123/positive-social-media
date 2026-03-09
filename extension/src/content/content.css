@@ -117,15 +117,22 @@
   pointer-events: none;
 }
 
-/* Safe: small chip anchored to top-right of wrapper */
+/* Safe: fallback — bottom-left of wrapper (avoids top-right overflow menu) */
 .psm-score-chip--safe {
   position: absolute;
-  top: 6px;
-  right: 6px;
+  bottom: 8px;
+  left: 8px;
   z-index: 5;
   background: rgba(0, 0, 0, 0.06);
   color: #888;
   border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+/* Inline variant: injected directly into the action row, no absolute positioning */
+.psm-score-chip--inline {
+  position: static;
+  margin-right: 6px;
+  align-self: center;
 }
 
 /* On dark Reddit themes */
