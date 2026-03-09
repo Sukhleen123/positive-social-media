@@ -152,11 +152,24 @@ function applyScore(elementId: string, isSensitive: boolean, score?: number) {
   if (!isSensitive) {
     overlay.remove();
     elementState.set(elementId, 'safe');
-    // Inject a small score chip into the wrapper for safe items
     if (storedScore !== undefined) {
       const existing = wrapper.querySelector('.psm-score-chip');
       if (!existing) {
-        wrapper.insertAdjacentHTML('beforeend', scoreChipHtml(storedScore, 'safe'));
+        // Try to inject chip into the action row in light DOM (left of overflow menu)
+        const postEl = wrapper.firstElementChild;
+        const actionRow = postEl?.querySelector(
+          '[slot="post-action-row"], [slot="actionRow"], [slot="action-row"], [slot="credit-bar"]'
+        );
+        if (actionRow) {
+          const chip = document.createElement('span');
+          chip.className = 'psm-score-chip psm-score-chip--safe psm-score-chip--inline';
+          chip.title = 'Relevance score';
+          chip.textContent = storedScore.toFixed(2);
+          actionRow.prepend(chip);
+        } else {
+          // Fallback: bottom-left of wrapper (avoids top-right overflow menu)
+          wrapper.insertAdjacentHTML('beforeend', scoreChipHtml(storedScore, 'safe'));
+        }
       }
     }
     return;
@@ -408,17 +421,35 @@ chrome.runtime.onMessage.addListener((message) => {
 
   startObserver();
 
-  // Retry if Reddit SPA hasn't rendered posts yet at document_idle
+  // Phase 1: retry every 500ms for up to 10 seconds (search pages load slowly via API)
   let initRetries = 0;
   function tryInitialProcess() {
     const found = document.querySelectorAll(ALL_SELECTOR);
-    console.log(`[PSM] init scan: found ${found.length} elements (selectors: ${ALL_SELECTOR})`);
+    console.log(`[PSM] init scan: found ${found.length} elements`);
     if (found.length > 0) {
       found.forEach(processElement);
-    } else if (initRetries < 5) {
+    } else if (initRetries < 20) {
       initRetries++;
       setTimeout(tryInitialProcess, 500);
     }
   }
   tryInitialProcess();
+
+  // Phase 2: periodic re-scan for content loaded inside faceplate-partial shadow roots
+  // or other async containers that MutationObserver on document.body cannot see.
+  let periodicCount = 0;
+  const periodicScan = setInterval(() => {
+    reprocessAll();
+    if (++periodicCount >= 15) clearInterval(periodicScan); // 15 × 2s = 30s
+  }, 2000);
+
+  // Phase 3: re-scan on Reddit SPA navigation (pushState / popstate)
+  const origPushState = history.pushState.bind(history);
+  history.pushState = (...args: Parameters<typeof history.pushState>) => {
+    origPushState(...args);
+    setTimeout(() => { removeAllOverlays(); reprocessAll(); }, 300);
+  };
+  window.addEventListener('popstate', () => {
+    setTimeout(() => { removeAllOverlays(); reprocessAll(); }, 300);
+  });
 })();
