@@ -12,6 +12,8 @@ class ModerationResult(Base):
     is_sensitive = Column(Boolean, nullable=False)
     model_version = Column(Text, nullable=False)
     scored_at = Column(Integer, nullable=False)
+    is_user_override = Column(Boolean, nullable=False, server_default="0")
+    pipeline_version = Column(Text, nullable=True)
 
     __table_args__ = (
         UniqueConstraint("content_id", "trigger_profile_id", name="uq_content_trigger"),

@@ -6,6 +6,7 @@ interface ModerationStoreState {
   setScore: (contentId: string, score: ModerationState) => void;
   getStatus: (contentId: string) => ModerationStatus;
   initPending: (contentIds: string[]) => void;
+  applyOverride: (contentId: string, isSensitive: boolean) => void;
   reset: () => void;
 }
 
@@ -28,6 +29,18 @@ export const useModerationStore = create<ModerationStoreState>()((set, get) => (
     }
     set((state) => ({ scores: { ...state.scores, ...pending } }));
   },
+
+  applyOverride: (contentId, isSensitive) =>
+    set((state) => ({
+      scores: {
+        ...state.scores,
+        [contentId]: {
+          ...state.scores[contentId],
+          status: isSensitive ? "sensitive" : "safe",
+          is_user_override: true,
+        },
+      },
+    })),
 
   reset: () => set({ scores: {} }),
 }));

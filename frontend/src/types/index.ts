@@ -29,6 +29,7 @@ export interface ScoreResult {
   content_id: string;
   cosine_score: number;
   is_sensitive: boolean;
+  is_user_override?: boolean;
 }
 
 export type ModerationStatus = "pending" | "safe" | "sensitive";
@@ -36,4 +37,11 @@ export type ModerationStatus = "pending" | "safe" | "sensitive";
 export interface ModerationState {
   status: ModerationStatus;
   cosine_score?: number;
+  is_user_override?: boolean;
+}
+
+export interface FeedbackRequest {
+  user_id: string;
+  content_id: string;
+  is_sensitive: boolean;
 }

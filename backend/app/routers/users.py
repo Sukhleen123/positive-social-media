@@ -1,6 +1,7 @@
 import time
 import uuid
 
+import numpy as np
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,6 +11,7 @@ from app.models.user import UserProfile, TriggerProfile
 from app.schemas.user import UserProfileCreate, UserProfileSchema, TriggerProfileSchema, TriggerProfileUpdate
 from app.services.embedding_service import embedding_service
 from app.services.cache_service import invalidate_trigger
+from app.services import llm_service
 
 router = APIRouter(prefix="/api/v1/users", tags=["users"])
 
@@ -49,9 +51,19 @@ async def upsert_trigger(
         await db.delete(old_trigger)
         await db.commit()
 
-    # Compute new embedding
+    # Compute trigger embedding
     emb = embedding_service.embed(body.raw_text)
     emb_bytes = embedding_service.serialize(emb)
+
+    # Expand trigger via LLM (HyDE)
+    expanded = await llm_service.expand_trigger(body.raw_text)
+
+    # Embed hypothetical examples
+    hyp_embeddings_bytes: bytes | None = None
+    if expanded.hypothetical_examples:
+        hyp_embs = embedding_service.embed_batch(expanded.hypothetical_examples)
+        flat = np.array(hyp_embs, dtype=np.float32).tobytes()
+        hyp_embeddings_bytes = flat
 
     trigger = TriggerProfile(
         id=str(uuid.uuid4()),
@@ -59,6 +71,10 @@ async def upsert_trigger(
         raw_text=body.raw_text,
         embedding=emb_bytes,
         updated_at=int(time.time()),
+        hypothetical_examples=expanded.hypothetical_examples,
+        hypothetical_embeddings=hyp_embeddings_bytes,
+        keywords=expanded.keywords,
+        exclusion_terms=expanded.exclusion_terms,
     )
     db.add(trigger)
     await db.commit()

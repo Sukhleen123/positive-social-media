@@ -1,6 +1,6 @@
 # Positive Social Media
 
-A Reddit-style content feed with a **personal AI sensitivity filter**. Users describe their triggers in natural language; an embedding-based pipeline scores each post for semantic similarity and blurs sensitive content before it reaches the user. Posts resolve one-by-one via Server-Sent Events as scores stream in.
+A Reddit-style content feed with a **personal AI sensitivity filter**. Users describe their triggers in natural language; a HyDE hybrid pipeline scores each post for semantic similarity and blurs sensitive content before it reaches the user. Posts resolve one-by-one via Server-Sent Events as scores stream in. Users can reveal, re-hide, and correct the model's decisions in real time.
 
 ---
 
@@ -9,11 +9,11 @@ A Reddit-style content feed with a **personal AI sensitivity filter**. Users des
 ```
 backend/          Python FastAPI — moderation pipeline, REST + SSE API
 ingestion/        Reddit fetcher + DB seeder
-frontend/         React + Vite + TypeScript — feed UI with blur/reveal UX
-docker-compose.yml
+frontend/         React + Vite + TypeScript — feed UI with blur/reveal/feedback UX
 ```
 
 **Embedding model:** `sentence-transformers/all-MiniLM-L6-v2` (~80MB, ~15ms/post on CPU, runs locally)
+**LLM:** `claude-haiku-4-5-20251001` via Anthropic SDK — used once at trigger-save time to expand triggers into hypothetical examples
 
 ---
 
@@ -47,7 +47,11 @@ npm run dev
 # UI at http://localhost:5173
 ```
 
-### 4. Docker (all at once)
+### 4. (Optional) Enable LLM expansion
+
+Add `ANTHROPIC_API_KEY=your_key` to `backend/.env`. Without it the pipeline degrades gracefully to single-embedding scoring.
+
+### 5. Docker (all at once)
 
 ```bash
 cp .env.example .env
@@ -59,10 +63,12 @@ docker-compose up --build
 ## Usage
 
 1. Open `http://localhost:5173`
-2. Enter your trigger text (e.g. *"dog attacks, animal violence"*)
-3. Click **Save Filter** — this embeds your text and stores it server-side
-4. Watch posts load: each starts blurred, then resolves to safe/sensitive as scores stream in
+2. Enter your trigger text (e.g. *"I don't want to see posts about AI"*)
+3. Click **Save Filter** — the backend embeds your text, calls Claude to generate hypothetical examples, and stores everything
+4. Watch posts load: each starts blurred (pending), then resolves to safe/sensitive as scores stream in
 5. Click **Reveal** on sensitive posts to read them
+6. After revealing: click **Hide again** to re-blur, or **Not sensitive** to permanently correct the model
+7. On safe posts: click **Flag as sensitive** to permanently mark them
 
 ---
 
@@ -72,21 +78,35 @@ docker-compose up --build
 |--------|------|-------------|
 | `POST` | `/api/v1/users` | Create user |
 | `GET` | `/api/v1/users/{id}/triggers` | Get user's trigger profile |
-| `PUT` | `/api/v1/users/{id}/triggers` | Save trigger text (recomputes embedding, invalidates cache) |
+| `PUT` | `/api/v1/users/{id}/triggers` | Save trigger (recomputes embedding + HyDE expansion, invalidates cache) |
 | `GET` | `/api/v1/content` | List content items (query: platform, limit, offset) |
-| `POST` | `/api/v1/moderate/batch` | Score a batch of posts |
+| `POST` | `/api/v1/moderate/batch` | Score a batch of posts synchronously |
 | `GET` | `/api/v1/moderate/stream` | SSE stream of scores (query: user_id, content_ids) |
+| `POST` | `/api/v1/moderate/feedback` | Submit a permanent user override (flag/unflag) |
 
 ---
 
-## Scoring Logic
+## Scoring Pipeline (HyDE Hybrid)
 
-```python
-score = np.dot(content_embedding, trigger_embedding)  # cosine similarity (L2-normalized)
-is_sensitive = score >= 0.45  # threshold tunable in config
+When a user saves a trigger, the backend:
+
+1. **Embeds** the raw trigger text → 384-dim float32 vector
+2. **Calls Claude** (`expand_trigger`) → returns 4 hypothetical post titles that *would* match the trigger, plus 5–8 keywords and 2–4 exclusion phrases
+3. **Embeds all hypothetical examples** → stores as flat `(N×384)` float32 blob in `trigger_profiles`
+
+At scoring time (`compute_hybrid_score`):
+
+```
+dense    = max cosine similarity(content_emb, [hyp_embs..., trigger_emb])
+lexical  = keyword hit-rate OR -0.15 if exclusion term matched
+bias     = +0.04 if post is from a high-risk subreddit (news, worldnews, politics...)
+combined = 0.75 * dense + 0.25 * lexical + bias
+sensitive = combined >= threshold * 0.80   # safety buffer fires at 80% of threshold
 ```
 
-Posts with cosine similarity ≥ 0.45 to the trigger are flagged sensitive. The threshold can be adjusted in `backend/app/config.py`.
+Default threshold: `0.45`. Safety buffer: `0.80` → effective trigger at `0.36`.
+
+Cache entries are versioned by `pipeline_version` (`"hyde-v1"`). User overrides (`is_user_override=True`) survive version bumps.
 
 ---
 
@@ -103,16 +123,17 @@ Posts with cosine similarity ≥ 0.45 to the trigger are flagged sensitive. The 
 
 ```
 backend/app/
-  config.py              Settings (DATABASE_URL, threshold, model name)
-  database.py            SQLAlchemy async engine + session
+  config.py              Settings (threshold=0.45, lexical_weight=0.25, safety_buffer=0.80, model_version="hyde-v1")
+  database.py            SQLAlchemy async engine + session + _migrate_db() for schema migrations
   models/                ORM: ContentItem, UserProfile, TriggerProfile, ModerationResult
-  schemas/               Pydantic request/response models
+  schemas/               Pydantic request/response models (incl. FeedbackRequest, ScoreResult)
   services/
     embedding_service.py Singleton SentenceTransformer wrapper
-    moderation_service.py Async generator orchestrator (cache → embed → score → yield)
-    cache_service.py     DB cache read/write/invalidation
-  pipeline/scoring.py    Cosine similarity + threshold logic
-  routers/               FastAPI routers: users, content, moderation (batch + SSE)
+    llm_service.py       expand_trigger() — calls Claude Haiku, returns ExpandedTrigger dataclass
+    moderation_service.py Async generator orchestrator (cache → embed → HyDE score → yield)
+    cache_service.py     Version-aware DB cache: partition(), write_result(), upsert_feedback()
+  pipeline/scoring.py    compute_hybrid_score() — dense + lexical + context bias + safety buffer
+  routers/               FastAPI routers: users, content, moderation (batch + SSE + feedback)
 
 ingestion/
   pushshift_client.py    Reddit JSON API fetcher
@@ -122,10 +143,10 @@ ingestion/
 frontend/src/
   api/                   Pure TS (no React): content, users, moderation, config
   types/index.ts         TypeScript interfaces matching Pydantic schemas
-  store/                 Zustand: feedStore, moderationStore, userStore
-  hooks/                 useContentFeed, useModerationScores (SSE lifecycle)
+  store/                 Zustand: feedStore, moderationStore (applyOverride), userStore
+  hooks/                 useContentFeed, useModerationScores (SSE lifecycle + error fallback)
   components/
-    feed/                Feed.tsx, PostCard.tsx
-    moderation/          ModeratedContent.tsx, LoadingOverlay.tsx
+    feed/                Feed.tsx, PostCard.tsx (wires feedback callbacks)
+    moderation/          ModeratedContent.tsx (pending/safe/sensitive + reveal/hide/flag)
     settings/            TriggerSettings.tsx
 ```

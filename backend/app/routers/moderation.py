@@ -1,12 +1,20 @@
 import asyncio
 import json
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.schemas.moderation import ModerationBatchRequest, ModerationBatchResponse, ScoreResult
+from app.models.user import TriggerProfile
+from app.schemas.moderation import (
+    ModerationBatchRequest,
+    ModerationBatchResponse,
+    ScoreResult,
+    FeedbackRequest,
+)
+from app.services import cache_service
 from app.services.moderation_service import score_content
 
 router = APIRouter(prefix="/api/v1/moderate", tags=["moderation"])
@@ -45,3 +53,17 @@ async def moderate_stream(
             "X-Accel-Buffering": "no",
         },
     )
+
+
+@router.post("/feedback")
+async def submit_feedback(
+    body: FeedbackRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    stmt = select(TriggerProfile).where(TriggerProfile.user_id == body.user_id)
+    trigger = (await db.execute(stmt)).scalars().first()
+    if trigger is None:
+        raise HTTPException(status_code=404, detail="No trigger profile found for user")
+
+    await cache_service.upsert_feedback(db, body.content_id, trigger.id, body.is_sensitive)
+    return {"ok": True}

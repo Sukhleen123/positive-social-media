@@ -22,5 +22,6 @@ class TriggerProfileSchema(BaseModel):
     user_id: str
     raw_text: str
     updated_at: int
+    hypothetical_examples: list[str] | None = None
 
     model_config = {"from_attributes": True}

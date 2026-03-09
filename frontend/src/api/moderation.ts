@@ -2,6 +2,18 @@ import axios from "axios";
 import { API_BASE } from "./config";
 import type { ScoreResult } from "../types";
 
+export async function submitFeedback(
+  userId: string,
+  contentId: string,
+  isSensitive: boolean
+): Promise<void> {
+  await axios.post(`${API_BASE}/api/v1/moderate/feedback`, {
+    user_id: userId,
+    content_id: contentId,
+    is_sensitive: isSensitive,
+  });
+}
+
 export async function moderateBatch(
   userId: string,
   contentIds: string[]
