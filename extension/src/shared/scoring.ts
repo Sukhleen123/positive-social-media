@@ -2,9 +2,9 @@
 // Constants match exactly
 
 const HIGH_RISK_SUBS = new Set(['news', 'worldnews', 'politics', 'morbidreality']);
-const LEXICAL_WEIGHT = 0.25;
-const DENSE_WEIGHT = 0.75;
-const SAFETY_BUFFER = 0.80;
+const LEXICAL_WEIGHT = 0.30;
+const DENSE_WEIGHT = 0.70;
+const SAFETY_BUFFER = 1.0;
 
 export interface HybridScoreInput {
   contentText: string;

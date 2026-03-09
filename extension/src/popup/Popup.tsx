@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { DEFAULT_SETTINGS, ExtensionSettings, GetStatusResponse } from '../shared/types';
 import { getSettings, saveSettings } from '../shared/storage';
+import { PREDEFINED_TOPICS } from '../shared/topics';
 
 interface ModelStatus {
   modelReady: boolean;
@@ -19,6 +20,7 @@ export default function Popup() {
   });
   const [triggerDraft, setTriggerDraft] = useState('');
   const [apiKeyDraft, setApiKeyDraft] = useState('');
+  const [selectedTopics, setSelectedTopics] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [saveResult, setSaveResult] = useState<string | null>(null);
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -29,6 +31,7 @@ export default function Popup() {
       setSettings(s);
       setTriggerDraft(s.triggerText);
       setApiKeyDraft(s.anthropicApiKey);
+      setSelectedTopics(s.selectedTopics ?? []);
     });
   }, []);
 
@@ -78,6 +81,14 @@ export default function Popup() {
     }
   }
 
+  async function handleTopicToggle(id: string) {
+    const next = selectedTopics.includes(id)
+      ? selectedTopics.filter((t) => t !== id)
+      : [...selectedTopics, id];
+    setSelectedTopics(next);
+    await saveSettings({ selectedTopics: next });
+  }
+
   async function handleSaveTrigger() {
     if (!triggerDraft.trim()) return;
     setSaving(true);
@@ -95,6 +106,7 @@ export default function Popup() {
         triggerText: triggerDraft,
         anthropicApiKey: apiKeyDraft,
         threshold: settings.threshold,
+        selectedTopics,
       });
 
       if (response?.success) {
@@ -206,6 +218,28 @@ export default function Popup() {
             {saveResult}
           </div>
         )}
+      </div>
+
+      <div className="divider" />
+
+      {/* Quick topic filters */}
+      <div className="section">
+        <label className="label">Quick topic filters</label>
+        <div className="topic-grid">
+          {PREDEFINED_TOPICS.map((topic) => {
+            const selected = selectedTopics.includes(topic.id);
+            return (
+              <button
+                key={topic.id}
+                className={`topic-chip ${selected ? 'topic-chip--on' : ''}`}
+                onClick={() => handleTopicToggle(topic.id)}
+              >
+                {topic.label}
+              </button>
+            );
+          })}
+        </div>
+        <p className="hint">Combined with your filter description above</p>
       </div>
 
       <div className="divider" />
