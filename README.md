@@ -104,7 +104,7 @@ combined = 0.75 * dense + 0.25 * lexical + bias
 sensitive = combined >= threshold * 0.80   # safety buffer fires at 80% of threshold
 ```
 
-Default threshold: `0.45`. Safety buffer: `0.80` → effective trigger at `0.36`.
+Default threshold: `0.38`. Safety buffer: `0.80` → effective trigger at `0.304`.
 
 Cache entries are versioned by `pipeline_version` (`"hyde-v1"`). User overrides (`is_user_override=True`) survive version bumps.
 

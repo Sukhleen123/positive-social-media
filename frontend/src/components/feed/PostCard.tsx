@@ -55,7 +55,11 @@ export function PostCard({ item }: Props) {
                 className={styles.score}
                 title={`Cosine similarity: ${score.toFixed(3)}`}
               >
-                {status === "sensitive" ? "🔴" : "🟢"} {score.toFixed(2)}
+                <span
+                  className={styles.scoreDot}
+                  style={{ background: `hsl(${Math.round((1 - Math.min(score / 0.55, 1)) * 120)}, 75%, 45%)` }}
+                />
+                {score.toFixed(2)}
               </span>
             )}
           </div>

@@ -128,7 +128,7 @@ Weights are configurable via `settings.lexical_weight` (default 0.25).
 
 ```python
 is_sensitive = combined >= threshold * safety_buffer
-# default: 0.45 * 0.80 = 0.36
+# default: 0.38 * 0.80 = 0.304
 ```
 
 The effective threshold is 80% of the nominal threshold. This is a deliberate asymmetric error preference: false positives (over-blurring) are less harmful than false negatives (under-blurring) for a sensitivity filter. Users can always reveal content; they can't un-see it.
