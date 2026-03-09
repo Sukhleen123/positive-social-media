@@ -17,10 +17,11 @@ let flushTimer: ReturnType<typeof setTimeout> | null = null;
 let observer: MutationObserver | null = null;
 let enabled = true;
 
-// Selectors covering both Reddit UIs:
-// - shreddit (web components, 2023+): shreddit-post / shreddit-comment
+// Selectors covering all Reddit page types:
+// - shreddit feed/comments (web components, 2023+): shreddit-post
 // - Old new-Reddit redesign (2018-2023): div[data-testid="post-container"]
-const POST_SELECTOR = 'shreddit-post, div[data-testid="post-container"]';
+// - Search results page: div[data-testid="search-post-with-content-preview"]
+const POST_SELECTOR = 'shreddit-post, div[data-testid="post-container"], div[data-testid="search-post-with-content-preview"]';
 const COMMENT_SELECTOR = 'shreddit-comment';
 const ALL_SELECTOR = `${POST_SELECTOR}, ${COMMENT_SELECTOR}`;
 
@@ -43,6 +44,13 @@ function getElementId(el: Element): string {
   // Shreddit posts/comments: thingid="t3_xxx" or thingid="t1_xxx"
   const thingId = el.getAttribute('thingid') || el.getAttribute('data-fullname');
   if (thingId) return 'psm-' + thingId;
+
+  // Search results page: title anchor has id="search-post-title-t3_xxx"
+  const searchTitleEl = el.querySelector('a[id^="search-post-title-"]');
+  if (searchTitleEl) {
+    const rawId = searchTitleEl.getAttribute('id')!.replace('search-post-title-', '');
+    return 'psm-' + rawId;
+  }
 
   // Native id that looks like a Reddit fullname
   const nativeId = el.getAttribute('id');
@@ -70,7 +78,14 @@ function getPostText(el: Element): string {
   const attrTitle = el.getAttribute('post-title');
   if (attrTitle?.trim()) return attrTitle.trim().slice(0, 500);
 
-  // 2. Shreddit: title anchor with id="post-title-{shortId}" (confirmed in Reddit DOM)
+  // 2. Search results page: dedicated title + snippet anchors
+  const searchTitle = el.querySelector('a[data-testid="post-title-text"]');
+  if (searchTitle?.textContent?.trim()) {
+    const snippet = el.querySelector('a[data-testid="post-title"]')?.textContent?.trim() ?? '';
+    return (searchTitle.textContent.trim() + (snippet ? ' ' + snippet : '')).slice(0, 500);
+  }
+
+  // 3. Shreddit: title anchor with id="post-title-{shortId}" (confirmed in Reddit DOM)
   const titleAnchor = el.querySelector('a[id^="post-title-"]');
   if (titleAnchor?.textContent?.trim()) return titleAnchor.textContent.trim().slice(0, 500);
 
