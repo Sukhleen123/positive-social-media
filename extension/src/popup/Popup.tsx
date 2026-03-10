@@ -205,25 +205,6 @@ export default function Popup() {
           value={triggerDraft}
           onChange={(e) => setTriggerDraft(e.target.value)}
         />
-        <div className="row-end">
-          <span className="char-count">{triggerDraft.length}/500</span>
-          <button
-            className="btn-primary"
-            onClick={handleSaveTrigger}
-            disabled={saving || !triggerDraft.trim() || !modelStatus.modelReady}
-          >
-            {saving ? (
-              <span className="spinner" />
-            ) : (
-              'Save trigger'
-            )}
-          </button>
-        </div>
-        {saveResult && (
-          <div className={`save-result ${saveResult.includes('!') ? 'save-result--ok' : 'save-result--err'}`}>
-            {saveResult}
-          </div>
-        )}
       </div>
 
       <div className="divider" />
@@ -292,6 +273,27 @@ export default function Popup() {
           autoComplete="off"
         />
         <p className="hint">Stored locally. Used only when saving a trigger.</p>
+      </div>
+
+      <div className="divider" />
+
+      {/* Save */}
+      <div className="section">
+        <div className="row-end">
+          <span className="char-count">{triggerDraft.length}/500</span>
+          <button
+            className="btn-primary"
+            onClick={handleSaveTrigger}
+            disabled={saving || !triggerDraft.trim() || !modelStatus.modelReady}
+          >
+            {saving ? <span className="spinner" /> : 'Save trigger'}
+          </button>
+        </div>
+        {saveResult && (
+          <div className={`save-result ${saveResult.includes('!') ? 'save-result--ok' : 'save-result--err'}`}>
+            {saveResult}
+          </div>
+        )}
       </div>
     </div>
   );
