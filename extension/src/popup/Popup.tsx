@@ -113,7 +113,13 @@ export default function Popup() {
         setSaveResult('Trigger saved!');
         setModelStatus((s) => ({ ...s, triggerReady: true }));
       } else {
-        setSaveResult(response?.error ?? 'Failed to save trigger');
+        const errorMsg = response?.error ?? 'Failed to save trigger';
+        if (errorMsg.toLowerCase().includes('not ready')) {
+          pollStatus();
+          setSaveResult('Model is re-initializing — try again in a moment');
+        } else {
+          setSaveResult(errorMsg);
+        }
       }
     } catch (err) {
       setSaveResult(String(err));
