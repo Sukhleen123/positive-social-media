@@ -129,10 +129,25 @@ function getCommentText(el: Element): string {
   return (el.textContent?.trim() ?? '').slice(0, 500);
 }
 
+function getCommentContentNode(el: Element): Element | null {
+  // Shreddit: content is in div[slot="comment"]
+  const slot = el.querySelector(':scope > div[slot="comment"]');
+  if (slot) return slot;
+  // Old-redesign: content is in the comment body container
+  const oldBody = el.querySelector(':scope > [data-testid="comment"], :scope > .RichTextJSON-root');
+  if (oldBody) return oldBody;
+  return null;
+}
+
 // ---- Overlay injection ----
 
 function injectOverlay(el: Element, elementId: string) {
-  if (el.closest('.psm-wrapper') || el.querySelector('.psm-overlay--pending')) return;
+  // For comments: wrap only the content slot, not the whole shreddit-comment
+  const isCommentEl = isComment(el);
+  const targetNode = isCommentEl ? getCommentContentNode(el) : null;
+  const wrapTarget = targetNode ?? el;
+
+  if (wrapTarget.closest('.psm-wrapper') || wrapTarget.querySelector('.psm-overlay--pending')) return;
 
   const wrapper = document.createElement('div');
   wrapper.className = 'psm-wrapper';
@@ -142,8 +157,8 @@ function injectOverlay(el: Element, elementId: string) {
   overlay.className = 'psm-overlay--pending';
   overlay.dataset.psmOverlay = 'pending';
 
-  el.parentNode?.insertBefore(wrapper, el);
-  wrapper.appendChild(el);
+  wrapTarget.parentNode?.insertBefore(wrapper, wrapTarget);
+  wrapper.appendChild(wrapTarget);
   wrapper.appendChild(overlay);
 
   elementState.set(elementId, 'pending');
